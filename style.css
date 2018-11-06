@@ -1,0 +1,18 @@
+slides > slide.title-slide {
+  background-image: url("images/2001_so.png");
+  background-size: 100% 100%;
+}
+
+table.rmdtable th{
+  background: white !important;
+  color: black !important;
+  border-bottom: 1px solid black;
+}
+
+table.rmdtable tr:nth-child(odd) {
+  background-color: white !important;
+}
+
+table.rmdtable {
+  border-collapse: collapse;
+}

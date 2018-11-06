@@ -1,0 +1,523 @@
+---
+title: "2001: A DATA ODYSSEY"
+subtitle: "Communicating Results With Coworkers"
+author: "Ludmila Janda, Data Scientist: Amplify" 
+output: 
+  ioslides_presentation:
+    incremental: true
+    widescreen: true
+    css: style.css
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+```
+
+```{r libraries, echo=FALSE}
+library(tidyverse)    # take all that is good about this universe
+library(PearsonDS)    # simulate normally distributed skewed data
+library(knitr)        # knit your rmarkdown
+library(kableExtra)   # make better tables
+library(ggridges)     # make ridgeline plots
+library(ggalluvial)   # make alluvial plots
+library(here)         # never rely on local paths again
+library(janitor)      # clean things up easily!
+library(dotwhisker)   # make dwplot easily for regression vis
+library(emo)          # use emojis in rmarkdown :-)
+
+options(scipen = 999)
+```
+
+```{r scores function, echo=FALSE}
+sim_data <- function(a, b, c, d, e, f, g) {
+  n_students <- a
+  moments <- c(mean <- b, variance <- c, skewness <- d, kurtosis <- 20)
+  set.seed(e)
+  df <- 
+    data.frame(
+      student = seq(1, n_students, 1),
+      score = rpearson(n_students, moments = moments)) %>% 
+    filter(score >= 0 & score <= 100) %>% 
+    mutate(unit_title = f, 
+           assessment = g)
+}
+```
+
+```{r normal pre scores, echo=FALSE}
+unicorn_pre <- 
+  sim_data(1000, 33, 130, -1.6, 48, "Unicorn Traits and Reproduction", "pre")
+
+potions_pre <- 
+  sim_data(1000, 27, 125, -1.9, 49, "Potions", "pre")
+
+dinosaur_pre <- 
+  sim_data(1000, 53, 137, -2, 50, "Dinosaur Domestication", "pre")
+
+life_pre <- 
+  sim_data(1000, 30, 134, -1.7, 51, "Life on Mars", "pre")
+
+unnatural_pre <- 
+  sim_data(1000, 41, 133, -1.8, 52, "Unnatural Selection", "pre")
+```
+
+```{r bimodal pre scores, echo=FALSE}
+n_students <- 1000
+moments1 <- c(mean = 20, variance = 40, skewness = -1.5, kurtosis = 20)
+moments2 <- c(mean = 43, variance = 150, skewness = -1.8, kurtosis = 20)
+
+set.seed(47)
+earth_pre <- 
+  data.frame(student = seq(1, n_students, 1),
+             group   = rbinom(n_students, 1, 0.4),
+             score_1 = rpearson(n_students, moments = moments1),
+             score_2 = rpearson(n_students, moments = moments2)) %>% 
+  mutate(score = ifelse(group ==1, score_2, score_1), 
+         unit_title = "Earth's Giant Turtle",
+         assessment = "pre") %>% 
+  filter(score >= 0 & score <= 100) %>% 
+  select(student, score, unit_title, assessment)
+```
+
+
+```{r bind pre units, echo=FALSE}
+sim_data_pre <- 
+  rbind(unicorn_pre, potions_pre, dinosaur_pre, 
+        life_pre, unnatural_pre, earth_pre)
+```
+
+
+```{r normal post scores, echo=FALSE}
+unicorn_post <- 
+  sim_data(1000, 83, 150, -1.6, 53, "Unicorn Traits and Reproduction", "post")
+
+potions_post <- 
+  sim_data(1000, 70, 155, -1.9, 54, "Potions", "post")
+
+dinosaur_post <- 
+  sim_data(1000, 90, 157, -2, 55, "Dinosaur Domestication", "post")
+
+life_post <- 
+  sim_data(1000, 68, 154, -1.7, 56, "Life on Mars", "post")
+
+unnatural_post <- 
+  sim_data(1000, 84, 153, -1.8, 57, "Unnatural Selection", "post")
+```
+
+
+```{r bimodal post scores, echo=FALSE}
+n_students <- 1000
+moments1 <- c(mean = 40, variance = 40, skewness = -1.5, kurtosis = 20)
+moments2 <- c(mean = 83, variance = 150, skewness = -1.8, kurtosis = 20)
+
+set.seed(47)
+earth_post <- 
+  data.frame(student = seq(1, n_students, 1),
+             group   = rbinom(n_students, 1, 0.7),
+             score_1 = rpearson(n_students, moments = moments1),
+             score_2 = rpearson(n_students, moments = moments2)) %>% 
+  mutate(score = ifelse(group ==1, score_2, score_1), 
+         unit_title = "Earth's Giant Turtle",
+         assessment = "post") %>% 
+  filter(score >= 0 & score <= 100) %>% 
+  select(student, score, unit_title, assessment)
+  
+```
+
+```{r bind post scores, echo=FALSE}
+sim_data_post <- 
+  rbind(unicorn_post, potions_post, dinosaur_post, 
+        life_post, unnatural_post, earth_post)
+```
+
+```{r join pre and post scores, echo=FALSE}
+# joining instead of binding in order to 
+# only keep the "students" that took both pre and post tests
+sim_data_pre_post <- 
+  inner_join(sim_data_pre, sim_data_post, by = c("student", "unit_title")) %>% 
+  rename(pre = score.x, post = score.y) %>% 
+  select(-starts_with("assessment")) %>% 
+  gather("assessment", "score", "pre", "post") %>% 
+  mutate(score_level = 
+           case_when(score < 40 ~ 1, 
+                     score >= 40 & score < 60 ~ 2,
+                     score >= 60 & score < 80 ~ 3, 
+                     score >= 80 ~ 4), 
+         score_level = fct_rev(factor(score_level)),
+         assessment = fct_rev(factor(assessment)),
+         user_unit = paste(student, unit_title))
+```
+
+
+## Amplify
+```{r echo=FALSE, out.width='80%'}
+knitr::include_graphics(here::here('images/amplify_sci.png'))
+```
+
+## Context
+```{r echo=FALSE, out.width='55%', fig.align = "center"}
+
+knitr::include_graphics(here::here('images/amp_6.png'))
+
+```
+
+
+## Context
+```{r echo=FALSE, out.width='60%', fig.align = "center"}
+knitr::include_graphics(here::here('images/meme.jpg'))
+```
+
+
+## Summary Statistics - Plain
+```{r, echo=FALSE, results='asis'} 
+# change table 
+ 
+sim_data_pre_post %>% 
+  select(-user_unit, -score_level) %>% 
+  spread(key = assessment, value = score) %>% 
+  group_by(unit_title) %>% 
+  summarise(num_s = n(), 
+            pre_mean = mean(pre, na.rm = TRUE),
+            post_mean = mean(post, na.rm = TRUE), 
+            perc_growth = (((post_mean - pre_mean) / pre_mean) * 100)) %>% 
+  kable(format = "markdown", 
+        align = "r", 
+        digits = 0, 
+        col.names = c("Unit",
+                    "No. Responses", 
+                    "Pre-Unit Mean", 
+                    "Post-Unit Mean", 
+                    "Percent Growth")) %>%
+  kable_styling(position = "left")
+
+```
+
+
+## Summary Statistics - kableExtra
+```{r, echo=FALSE, results='asis'} 
+sim_data_pre_post %>% 
+  select(-user_unit, -score_level) %>% 
+  spread(key = assessment, value = score) %>% 
+  group_by(unit_title) %>% 
+  summarise(num_s = n(), 
+            pre_mean = round(mean(pre, na.rm = TRUE), 0), 
+            post_mean = round(mean(post, na.rm = TRUE), 0),
+            perc_growth = round((((post_mean - pre_mean) / pre_mean) * 100), 0)) %>%
+  mutate(post_mean = cell_spec(post_mean, 
+                               "html", 
+                               bold = T, 
+                               font_size = 20,
+                               color = spec_color(post_mean, 
+                                                    begin = 0, 
+                                                    end = 0.7, 
+                                                    direction = 1,
+                                                    option = "B")), 
+        perc_growth = cell_spec(perc_growth, 
+                                "html", 
+                                bold = T, 
+                                font_size = 20,
+                                color = spec_color(perc_growth, 
+                                                    begin = 0, 
+                                                    end = 0.7, 
+                                                    direction = 1,
+                                                    option = "B"))) %>% 
+  kable(format = "markdown", 
+        align = "r", 
+        col.names = c("Unit",
+                    "No. Responses", 
+                    "Pre-Unit Mean", 
+                    "Post-Unit Mean", 
+                    "Percent Growth")) %>%
+  kable_styling(position = "left")
+
+
+```
+
+## Summary Statistics Code
+```{r, eval=FALSE} 
+sim_data_pre_post %>% 
+  mutate(post_mean = kableExtra::cell_spec(post_mean, "html", 
+                                           bold = T, font_size = 20,
+                                 color = kableExtra::spec_color(post_mean, 
+                                                                begin = 0, 
+                                                                end = 0.6, 
+                                                                direction = 1,
+                                                                option = "B")), 
+        perc_growth = kableExtra::cell_spec(perc_growth, "html", 
+                                            bold = T, font_size = 20,
+                                 color = kableExtra::spec_color(perc_growth, 
+                                                                begin = 0, 
+                                                                end = 0.6, 
+                                                                direction = 1,
+                                                                option = "B"))) %>% 
+  knitr::kable(format = "markdown", align = "r", 
+               col.names = c("Unit", "No. Responses", "Pre-Unit Mean", 
+                             "Post-Unit Mean", "Percent Growth")) %>%
+  kableExtra::kable_styling(position = "left")
+
+```
+
+
+## Boxplot
+```{r out.width = '90%', echo=FALSE}
+sim_data_post %>% 
+  ggplot(aes(reorder(unit_title, -score), score)) +
+  geom_boxplot() +
+  coord_flip() +
+  labs(y = "Score", x = "") 
+```
+
+
+## Ridgeplot
+```{r out.width = '90%', echo=FALSE}
+sim_data_post %>% 
+  ggplot(aes(score, reorder(unit_title, -score))) +
+  ggridges::geom_density_ridges(scale = 1, 
+                      rel_min_height = 0.001) + 
+  scale_x_continuous(limits = c(0, 100), expand = c(0.01, 0)) + 
+  scale_y_discrete(expand = c(0.2, 0)) + 
+  labs(x = "Score", y = "") + 
+  theme_minimal() 
+```
+
+## Ridgeplot Code
+```{r out.width = '100%', eval=FALSE}
+sim_data_post %>% 
+  ggplot(aes(score, 
+             reorder(unit_title, -score))) +      # order by score
+  ggridges::geom_density_ridges(
+                      scale = 1,                  # ridge height/overlap 
+                      rel_min_height = 0.001,     # where to draw line 
+  scale_x_continuous(limits = c(0, 100),          # limits - set cutoff 
+                     expand = c(0.01, 0)) + 
+  scale_y_discrete(expand = c(0.2, 0)) +          # padding around graph 
+  labs(x = "Score", y = "") + 
+  theme_minimal()
+```
+
+
+## Stacked Bars
+```{r out.width = '90%', echo=FALSE}
+# learning progression 
+sim_data_pre_post %>% 
+  group_by(unit_title, assessment, score_level) %>% 
+  summarise(count = n()) %>% 
+  ggplot(aes(assessment, count), order=-as.numeric(score_level)) +
+  geom_bar(stat = "identity", 
+           position = "fill", 
+           aes(fill = score_level)) + 
+  facet_wrap(~unit_title) +
+  scale_fill_manual("Score Level", 
+                    values = c("1" = "#4d5050", 
+                               "2" = "#c2c5c6", 
+                               "3" = "#f2ac80", 
+                               "4" = "#F37321")) +
+  xlab("") +
+  ylab("") + 
+  theme_bw() + 
+  theme(panel.border = element_blank(), 
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(), 
+        axis.line = element_line(colour = "black"), 
+        strip.text.x = element_text(size = 7))
+```
+
+## Stacked Bars Code
+```{r out.width = '100%', eval=FALSE}
+sim_data_pre_post %>% 
+  group_by(unit_title, assessment, score_level) %>% 
+  summarise(count = n()) %>% 
+  ggplot(aes(assessment, count), order=-as.numeric(score_level)) +
+  geom_bar(stat = "identity", position = "fill", aes(fill = score_level)) + 
+  facet_wrap(~unit_title) +
+  scale_fill_manual("Score Level", 
+                    values = c("1" = "#4d5050", "2" = "#c2c5c6", 
+                               "3" = "#f2ac80", "4" = "#F37321")) +
+  labs(x = "", y = "") +
+  theme_bw() + 
+  theme(panel.border = element_blank(), 
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(), 
+        axis.line = element_line(colour = "black"), 
+        strip.text.x = element_text(size = 7))
+```
+
+
+## Alluvial Plot 
+```{r out.width = '90%', echo=FALSE}
+sim_data_pre_post %>% 
+  ggplot(aes(x = assessment, 
+           stratum = score_level, 
+           alluvium = user_unit,
+           fill = score_level, 
+           label = score_level)) +
+  scale_fill_manual("Score Level",
+                     values = c("1" = "#4d5050", "2" = "#c2c5c6", 
+                               "3" = "#f2ac80", "4" = "#F37321")) +
+  ggalluvial::geom_flow(stat = "alluvium", 
+                        aes.flow = "forward", 
+                        alpha = 1) +
+  ggalluvial::geom_stratum() +
+  labs(x = "") +
+  facet_wrap(~unit_title, scales = "free_y") + 
+  theme_bw() + 
+  theme(panel.border = element_blank(), 
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(), 
+        axis.line = element_line(colour = "black"), 
+        strip.text.x = element_text(size = 7))
+```
+
+
+## Alluvial Plot Code
+```{r eval=FALSE}
+sim_data_pre_post %>% 
+  ggplot(aes(x = assessment,               # categorical x var (pre or post)
+           stratum = score_level,          # categorical var (score level)
+           alluvium = user_unit,           # individual/unit 
+           fill = score_level,             # color of fill
+           label = score_level)) +         # color of legend
+  ggalluvial::geom_flow(stat = "alluvium", 
+              aes.flow = "forward",        # direction of flow
+              alpha = 1) +                 # density of fill 
+  ggalluvial::geom_stratum() +
+  labs(x = "") +
+  facet_wrap(~unit_title, 
+             scales = "free_y") +          # let y scale vary by facet
+  scale_fill_manual("Score Level",
+                     values = c("1" = "#4d5050", "2" = "#c2c5c6", 
+                               "3" = "#f2ac80", "4" = "#F37321"))  # ...
+
+```
+
+## Regression Output {.smaller} 
+```{r echo=FALSE}
+set.seed(23)
+moments <- c(mean = 50, variance = 1, skewness = -1.7, kurtosis = 20)
+
+sim_data_pre_post1 <- 
+  sim_data_pre_post %>% 
+  select(-score_level, -user_unit) %>% 
+  spread(key = assessment, value = score) %>% 
+  mutate(yesno = 1) %>%
+  spread(unit_title, yesno, fill = 0) %>% 
+  mutate(nstu = length(post), 
+         pre = pre + (post * 0.48), 
+         time = rpearson(nstu, moments = moments),
+         time = (time + (post * 0.002))) 
+
+sim_data_pre_post1 <- 
+  clean_names(sim_data_pre_post1) %>% 
+  rename(dino = dinosaur_domestication, 
+         turtle = earths_giant_turtle, 
+         unicorn = unicorn_traits_and_reproduction)
+
+
+reg1 <- lm(post ~ 
+             pre + 
+             time +
+             dino + 
+             turtle + 
+             life_on_mars + 
+             potions + 
+             unnatural_selection, 
+           sim_data_pre_post1)
+options(digits = 2)
+summary(reg1)
+```
+
+## Regression Visualization 
+```{r out.width = '90%', echo=FALSE}
+reg1 <- broom::tidy(reg1) %>% 
+  mutate(term = c("(Intercept)",
+                  "Pre-Unit Score", 
+                  "Time in Costume", 
+                  "Dinosaur Domestication", 
+                  "Earth's Giant Turtle", 
+                  "Life on Mars", 
+                  "Potions", 
+                  "Unnatural Selection"))
+
+dwplot(reg1) +
+  theme_minimal() +
+  theme(legend.position = "none") +
+  geom_vline(xintercept = 0, colour = "grey60", linetype = 2) +
+  scale_x_continuous(limits = c(-15, 5))
+```
+
+
+## Regression Visualization Code
+```{r eval=FALSE}
+reg1 <- broom::tidy(reg1) %>%             # tidy regression output
+  mutate(term = c("(Intercept)",          # make output variables readable
+                  "Pre-Unit Score", 
+                  "Time in Costume", 
+                  "Dinosaur Domestication", 
+                  "Earth's Giant Turtle", 
+                  "Life on Mars", 
+                  "Potions", 
+                  "Unnatural Selection"))
+
+dotwhisker::dwplot(reg1) +                 # make dot and whisker plot 
+  theme_minimal() +
+  theme(legend.position = "none") +        # remove legend
+  geom_vline(xintercept = 0,               # set reference line at zero 
+             colour = "grey60",            # make reference line grey
+             linetype = 2) +               # make reference line dashed
+  scale_x_continuous(limits = c(-15, 5))   # set limits for the x axis 
+```
+
+## Takeaways 
+
+- Visualize when possible! 
+- Think about your design
+- Make use of color 
+- Think about the general takeaway 
+- Use the same language as your audience 
+- Use Rmarkdown
+
+```{r echo=FALSE, out.width='50%'}
+knitr::include_graphics(here::here('images/2001_title.jpg'))
+```
+
+
+## References {.smaller} 
+
+- Adding color to tables with kableExtra: https://haozhu233.github.io/kableExtra/awesome_table_in_html.html#visualize_data_with_viridis_color
+
+- ggridges intro: 
+https://cran.r-project.org/web/packages/ggridges/vignettes/introduction.html
+
+- ggridges gallery: 
+https://cran.r-project.org/web/packages/ggridges/vignettes/gallery.html
+
+- Alluvial/Sankey: 
+https://cran.r-project.org/web/packages/ggalluvial/vignettes/ggalluvial.html
+
+- Dotwhisker: 
+https://cran.r-project.org/web/packages/dotwhisker/vignettes/dotwhisker-vignette.html
+
+- Claus Wilke's forthcoming book on data visualization:
+https://serialmentor.com/dataviz/
+
+
+
+## Thank Yous
+
+- Soumya Kalra for telling me I was giving a talk `r emo::ji("scream")` 
+- My awesome data science team 
+(Samuel Crane, Tashi Lama, and Harry Gamble) for 
+listening to me give this talk and 
+giving great feedback
+
+- 
+```{r echo=FALSE, out.width='30%'}
+knitr::include_graphics(here::here('images/samuels.jpg'))
+```
+
+- My awesome data scientist husband 
+(Sebastian Teran Hidalgo)
+for also listening to me give this talk and 
+giving great feedback
+- My coworker Jesse Vogel for helping me 
+change the css for the isoslides table output
+
